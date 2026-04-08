@@ -167,7 +167,7 @@ function renderDashboard() {
   list.innerHTML = filtered.map(t => {
     const doneToday = t.type === 'repeat' ? (t.completedDates||[]).includes(td) : t.done;
     const dateText = t.type === 'repeat' && t.endDate ? `${fmtDisplay(t.startDate||t.date)} ~ ${fmtDisplay(t.endDate)}` : fmtDisplay(t.date);
-    return `<div class="task-card" data-q="${t.matrix}" data-id="${t.id}"><div class="tc-check ${doneToday?'checked':''}" data-check="${t.id}">${doneToday?'✓':''}</div><div class="tc-body"><div class="tc-title ${doneToday?'done':''}">${t.type==='repeat'?'🔄 ':''}${esc(t.title)}</div><div class="tc-meta"><span class="tc-badge">${t.type==='repeat'?'반복':'한 번'}</span>${dateText?`<span class="tc-date">${dateText}</span>`:''}</div></div><div class="tc-matrix">${buildTaskMatrix(t.matrix,20)}</div></div>`;
+    return `<div class="task-card-wrapper" data-id="${t.id}"><div class="task-card" data-q="${t.matrix}" data-id="${t.id}"><div class="tc-check ${doneToday?'checked':''}" data-check="${t.id}">${doneToday?'✓':''}</div><div class="tc-body"><div class="tc-title ${doneToday?'done':''}">${t.type==='repeat'?'🔄 ':''}${esc(t.title)}</div><div class="tc-meta"><span class="tc-badge">${t.type==='repeat'?'반복':'한 번'}</span>${dateText?`<span class="tc-date">${dateText}</span>`:''}</div></div><div class="tc-matrix">${buildTaskMatrix(t.matrix,20)}</div></div><div class="delete-btn" data-delete-id="${t.id}"><svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>삭제</div></div>`;
   }).join('');
 }
 
@@ -819,8 +819,42 @@ function bindEvents() {
     renderDashboard();
   });
 
+  // SWIPE TO DELETE LOGIC
+  let touchStartX = 0;
+  let swipeTarget = null;
+  document.addEventListener('touchstart', e => {
+    const wrapper = e.target.closest('.task-card-wrapper');
+    if (!wrapper && !e.target.closest('.delete-btn')) {
+      document.querySelectorAll('.task-card-wrapper.swiped').forEach(w => w.classList.remove('swiped'));
+    }
+    if (wrapper) {
+      swipeTarget = wrapper;
+      touchStartX = e.touches[0].clientX;
+    }
+  }, {passive: true});
+
+  document.addEventListener('touchend', e => {
+    if (!swipeTarget) return;
+    const touchEndX = e.changedTouches[0].clientX;
+    const deltaX = touchEndX - touchStartX;
+    if (deltaX < -30) {
+      document.querySelectorAll('.task-card-wrapper.swiped').forEach(w => w.classList.remove('swiped'));
+      swipeTarget.classList.add('swiped');
+    } else if (deltaX > 30) {
+      swipeTarget.classList.remove('swiped');
+    }
+    swipeTarget = null;
+  });
+
   // TASK CARD CLICK
   document.addEventListener('click', e => {
+    const delBtn = e.target.closest('.delete-btn[data-delete-id]');
+    if (delBtn) { e.stopPropagation(); deleteTask(delBtn.dataset.deleteId); return; }
+    
+    // Auto-close swipe state if clicking somewhere else
+    const swiped = document.querySelector('.task-card-wrapper.swiped');
+    if (swiped && !e.target.closest('.task-card-wrapper.swiped')) { swiped.classList.remove('swiped'); }
+
     const chk = e.target.closest('[data-check]');
     if (chk) { e.stopPropagation(); toggleDone(chk.dataset.check); return; }
     const habitCell = e.target.closest('[data-routine-date]');
