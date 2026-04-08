@@ -108,7 +108,7 @@ input { font-family: inherit; }
 }
 .row-axis-label {
   font-size: 10px; font-weight: 600; writing-mode: vertical-rl;
-  transform: rotate(180deg); text-align: center;
+  text-align: center;
   color: var(--text3); letter-spacing: -.1px;
 }
 .row-axis-label.important { color: var(--do); }

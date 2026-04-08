@@ -35,7 +35,7 @@ let fullSelectedColor = COLORS[0];
 let fullTaskType = 'once';
 let fullChecklist = [];
 let fullRepeatDays = [];
-let matrixSortBy = 'added';
+let matrixStatusFilter = 'incomplete';
 
 // ── UTILS ──────────────────────────────────
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
@@ -106,14 +106,24 @@ function render(tab) {
 
 // ── MATRIX SCREEN ──────────────────────────
 function renderMatrix() {
+  const td = today();
   ['do','plan','delegate','eliminate'].forEach(q => {
     const container = document.getElementById(`q-${q}`);
     if (!container) return;
-    let qTasks = tasks.filter(t => t.matrix === q);
-    if (matrixSortBy === 'date-asc')  qTasks = qTasks.slice().sort((a,b) => (a.date||'9999').localeCompare(b.date||'9999'));
-    if (matrixSortBy === 'date-desc') qTasks = qTasks.slice().sort((a,b) => (b.date||'').localeCompare(a.date||''));
+    
+    // Base filter by quadrant & sort by date ascending
+    let qTasks = tasks.filter(t => t.matrix === q)
+                      .sort((a,b) => (a.date||'9999').localeCompare(b.date||'9999'));
+                      
+    // Status filter
+    if (matrixStatusFilter === 'incomplete') {
+      qTasks = qTasks.filter(t => t.type === 'repeat' ? !(t.completedDates||[]).includes(td) : !t.done);
+    } else if (matrixStatusFilter === 'complete') {
+      qTasks = qTasks.filter(t => t.type === 'repeat' ? (t.completedDates||[]).includes(td) : t.done);
+    }
+
     if (qTasks.length === 0) {
-      container.innerHTML = `<p class="q-empty">할 일을 추가해보세요</p>`;
+      container.innerHTML = `<p class="q-empty">${matrixStatusFilter === 'complete' ? '완료된 할 일이 없어요' : '모두 완료했어요! 🎉'}</p>`;
       return;
     }
     container.innerHTML = qTasks.map(t => {
@@ -652,10 +662,10 @@ function buildRoutineContent(task) {
     </div>`;
 }
 
-// ── SORT ───────────────────────────────────
-function setSortBy(val) {
-  matrixSortBy = val;
-  document.querySelectorAll('.sort-opt').forEach(btn => btn.classList.toggle('active', btn.dataset.sort===val));
+// ── FILTER ───────────────────────────────────
+function setMatrixFilter(val) {
+  matrixStatusFilter = val;
+  document.querySelectorAll('.sort-opt').forEach(btn => btn.classList.toggle('active', btn.dataset.filter===val));
   renderMatrix();
   const menu = document.getElementById('sort-menu');
   if (menu) menu.classList.remove('open');
@@ -848,7 +858,7 @@ function bindEvents() {
   });
   document.getElementById('sort-menu').addEventListener('click', e => {
     const btn = e.target.closest('.sort-opt');
-    if (btn) setSortBy(btn.dataset.sort);
+    if (btn) setMatrixFilter(btn.dataset.filter);
   });
   document.addEventListener('click', e => {
     const menu = document.getElementById('sort-menu');
