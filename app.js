@@ -605,7 +605,7 @@ function toggleRoutineDate(taskId, dateStr) {
 function buildRoutineContent(task) {
   const start = task.startDate || task.date || today();
   const rawEnd = task.endDate || today();
-  const limitDate = fmtDate(new Date(Math.min(new Date(rawEnd+'T00:00:00'), new Date())));
+  const limitDate = rawEnd;
   const completedDates = task.completedDates || [];
   const dayMap = {0:'Sun',1:'Mon',2:'Tue',3:'Wed',4:'Thu',5:'Fri',6:'Sat'};
   const allDates = [];
@@ -624,12 +624,28 @@ function buildRoutineContent(task) {
   const r=46,cx=60,cy=60,circum=2*Math.PI*r;
   const dash=(pct/100)*circum;
   const repeatInfo=task.repeatDays&&task.repeatDays.length>0?task.repeatDays.map(d=>DAY_KR[d]).join(', '):'매일';
-  const grid = allDates.map(d=>{
-    const done=completedDates.includes(d);
-    const [,m,day]=d.split('-');
-    return `<div class="habit-cell" data-routine-date="${d}" data-task-id="${task.id}">
-      <div class="habit-circ ${done?'done':''}">${done?'<svg viewBox="0 0 20 20"><polyline points="16 5 8 14 4 10" stroke="white" stroke-width="2.2" fill="none" stroke-linecap="round"/></svg>':''}</div>
-      <span class="habit-date-lbl">${parseInt(m)}.${parseInt(day)}</span>
+
+  // Group by month
+  const months = {};
+  allDates.forEach(d => {
+    const [,m] = d.split('-');
+    const mLabel = `${parseInt(m)}월`;
+    if (!months[mLabel]) months[mLabel] = [];
+    months[mLabel].push(d);
+  });
+
+  const grid = Object.keys(months).map(mLabel => {
+    const cells = months[mLabel].map(d => {
+      const done=completedDates.includes(d);
+      const [,m,day]=d.split('-');
+      return `<div class="habit-cell" data-routine-date="${d}" data-task-id="${task.id}">
+        <div class="habit-circ ${done?'done':''}">${done?'<svg viewBox="0 0 20 20"><polyline points="16 5 8 14 4 10" stroke="white" stroke-width="2.2" fill="none" stroke-linecap="round"/></svg>':''}</div>
+        <span class="habit-date-lbl">${parseInt(m)}.${parseInt(day)}</span>
+      </div>`;
+    }).join('');
+    return `<div class="month-group">
+      <div class="month-group-label">${mLabel}</div>
+      <div class="habit-grid">${cells}</div>
     </div>`;
   }).join('');
   return `
@@ -658,7 +674,7 @@ function buildRoutineContent(task) {
     </div>
     <div class="routine-grid-section">
       <div class="rg-header"><span>완료 기록</span><span>${total}일간</span></div>
-      <div class="habit-grid">${total>0?grid:'<p style="color:#9BA3AF;font-size:13px;padding:12px 0">아직 기록이 없어요</p>'}</div>
+      <div class="routine-months">${total>0?grid:'<p style="color:#9BA3AF;font-size:13px;padding:12px 0">아직 기록이 없어요</p>'}</div>
     </div>`;
 }
 
