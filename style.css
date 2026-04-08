@@ -692,7 +692,14 @@ input { font-family: inherit; }
 .month-group-label {
   font-size: 14px; font-weight: 700; color: var(--text);
   margin-bottom: 12px; padding-bottom: 6px; border-bottom: 1px dashed var(--border);
+  cursor: pointer; list-style: none; user-select: none;
 }
+.month-group-label::-webkit-details-marker { display: none; }
+.month-group-label::after {
+  content: '▼'; float: right; font-size: 11px; color: var(--text3);
+  transition: transform .2s; margin-top: 3px;
+}
+details[open] .month-group-label::after { transform: rotate(180deg); }
 .habit-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px 8px; }
 .habit-cell {
   display: flex; flex-direction: column; align-items: center; gap: 5px;

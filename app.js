@@ -128,6 +128,7 @@ function renderMatrix() {
     }
     container.innerHTML = qTasks.map(t => {
       const doneToday = t.type === 'repeat' ? (t.completedDates||[]).includes(today()) : t.done;
+      const dateText = t.type === 'repeat' && t.endDate ? `${fmtDisplay(t.startDate||t.date)} ~ ${fmtDisplay(t.endDate)}` : fmtDisplay(t.date);
       return `
         <div class="q-task" data-q="${q}" data-id="${t.id}">
           <div class="q-cb ${doneToday?'checked':''}" data-check="${t.id}"></div>
@@ -136,7 +137,7 @@ function renderMatrix() {
               ${t.type==='repeat'?'<span style="font-size:9px;margin-right:2px">🔄</span>':''}
               ${esc(t.title)}
             </div>
-            ${t.date?`<div class="q-task-date">${fmtDisplay(t.date)}</div>`:''}
+            ${dateText?`<div class="q-task-date">${dateText}</div>`:''}
           </div>
         </div>`;
     }).join('');
@@ -165,7 +166,8 @@ function renderDashboard() {
   }
   list.innerHTML = filtered.map(t => {
     const doneToday = t.type === 'repeat' ? (t.completedDates||[]).includes(td) : t.done;
-    return `<div class="task-card" data-q="${t.matrix}" data-id="${t.id}"><div class="tc-check ${doneToday?'checked':''}" data-check="${t.id}">${doneToday?'✓':''}</div><div class="tc-body"><div class="tc-title ${doneToday?'done':''}">${t.type==='repeat'?'🔄 ':''}${esc(t.title)}</div><div class="tc-meta"><span class="tc-badge">${t.type==='repeat'?'반복':'한 번'}</span>${t.date?`<span class="tc-date">${fmtDisplay(t.date)}</span>`:''}</div></div><div class="tc-matrix">${buildTaskMatrix(t.matrix,20)}</div></div>`;
+    const dateText = t.type === 'repeat' && t.endDate ? `${fmtDisplay(t.startDate||t.date)} ~ ${fmtDisplay(t.endDate)}` : fmtDisplay(t.date);
+    return `<div class="task-card" data-q="${t.matrix}" data-id="${t.id}"><div class="tc-check ${doneToday?'checked':''}" data-check="${t.id}">${doneToday?'✓':''}</div><div class="tc-body"><div class="tc-title ${doneToday?'done':''}">${t.type==='repeat'?'🔄 ':''}${esc(t.title)}</div><div class="tc-meta"><span class="tc-badge">${t.type==='repeat'?'반복':'한 번'}</span>${dateText?`<span class="tc-date">${dateText}</span>`:''}</div></div><div class="tc-matrix">${buildTaskMatrix(t.matrix,20)}</div></div>`;
   }).join('');
 }
 
@@ -643,10 +645,10 @@ function buildRoutineContent(task) {
         <span class="habit-date-lbl">${parseInt(m)}.${parseInt(day)}</span>
       </div>`;
     }).join('');
-    return `<div class="month-group">
-      <div class="month-group-label">${mLabel}</div>
+    return `<details class="month-group" open>
+      <summary class="month-group-label">${mLabel}</summary>
       <div class="habit-grid">${cells}</div>
-    </div>`;
+    </details>`;
   }).join('');
   return `
     <div class="routine-meta">
