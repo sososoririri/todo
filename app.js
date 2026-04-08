@@ -820,31 +820,47 @@ function bindEvents() {
   });
 
   // SWIPE TO DELETE LOGIC
-  let touchStartX = 0;
+  let swipeStartX = 0;
+  let swipeStartY = 0;
   let swipeTarget = null;
-  document.addEventListener('touchstart', e => {
+  let isDown = false;
+
+  function onSwipeStart(e) {
     const wrapper = e.target.closest('.task-card-wrapper');
     if (!wrapper && !e.target.closest('.delete-btn')) {
       document.querySelectorAll('.task-card-wrapper.swiped').forEach(w => w.classList.remove('swiped'));
     }
     if (wrapper) {
       swipeTarget = wrapper;
-      touchStartX = e.touches[0].clientX;
+      isDown = true;
+      swipeStartX = e.touches ? e.touches[0].clientX : e.clientX;
+      swipeStartY = e.touches ? e.touches[0].clientY : e.clientY;
     }
-  }, {passive: true});
+  }
 
-  document.addEventListener('touchend', e => {
-    if (!swipeTarget) return;
-    const touchEndX = e.changedTouches[0].clientX;
-    const deltaX = touchEndX - touchStartX;
-    if (deltaX < -30) {
-      document.querySelectorAll('.task-card-wrapper.swiped').forEach(w => w.classList.remove('swiped'));
-      swipeTarget.classList.add('swiped');
-    } else if (deltaX > 30) {
-      swipeTarget.classList.remove('swiped');
+  function onSwipeEnd(e) {
+    if (!isDown || !swipeTarget) return;
+    const endX = e.changedTouches ? e.changedTouches[0].clientX : e.clientX;
+    const endY = e.changedTouches ? e.changedTouches[0].clientY : e.clientY;
+    const deltaX = endX - swipeStartX;
+    const deltaY = endY - swipeStartY;
+    
+    if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 30) {
+      if (deltaX < 0) { // Swipe left
+        document.querySelectorAll('.task-card-wrapper.swiped').forEach(w => w.classList.remove('swiped'));
+        swipeTarget.classList.add('swiped');
+      } else { // Swipe right
+        swipeTarget.classList.remove('swiped');
+      }
     }
+    isDown = false;
     swipeTarget = null;
-  });
+  }
+
+  document.addEventListener('touchstart', onSwipeStart, {passive: true});
+  document.addEventListener('touchend', onSwipeEnd);
+  document.addEventListener('mousedown', onSwipeStart);
+  document.addEventListener('mouseup', onSwipeEnd);
 
   // TASK CARD CLICK
   document.addEventListener('click', e => {
