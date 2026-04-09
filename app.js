@@ -159,13 +159,13 @@ function renderMatrix() {
       return;
     }
     container.innerHTML = qTasks.map(t => {
-      const doneToday = t.type === 'repeat' ? (t.completedDates||[]).includes(today()) : t.done;
+      const isDone = t.done;
       const dateText = t.type === 'repeat' && t.endDate ? `${fmtDisplay(t.startDate||t.date)} ~ ${fmtDisplay(t.endDate)}` : fmtDisplay(t.date);
       return `
         <div class="q-task" data-q="${q}" data-id="${t.id}">
-          <div class="q-cb ${doneToday?'checked':''}" data-check="${t.id}"></div>
+          <div class="q-cb ${isDone?'checked':''}" data-check="${t.id}"></div>
           <div class="q-task-info">
-            <div class="q-task-title ${doneToday?'done':''}">
+            <div class="q-task-title ${isDone?'done':''}">
               ${t.type==='repeat'?'<span style="font-size:9px;margin-right:2px">🔄</span>':''}
               ${esc(t.title)}
             </div>
@@ -197,9 +197,9 @@ function renderDashboard() {
     return;
   }
   list.innerHTML = filtered.map(t => {
-    const doneToday = t.type === 'repeat' ? (t.completedDates||[]).includes(td) : t.done;
+    const isDone = t.done;
     const dateText = t.type === 'repeat' && t.endDate ? `${fmtDisplay(t.startDate||t.date)} ~ ${fmtDisplay(t.endDate)}` : fmtDisplay(t.date);
-    return `<div class="task-card-wrapper" data-id="${t.id}"><div class="task-card" data-q="${t.matrix}" data-id="${t.id}"><div class="tc-check ${doneToday?'checked':''}" data-check="${t.id}">${doneToday?'✓':''}</div><div class="tc-body"><div class="tc-title ${doneToday?'done':''}">${t.type==='repeat'?'🔄 ':''}${esc(t.title)}</div><div class="tc-meta"><span class="tc-badge">${t.type==='repeat'?'반복':'한 번'}</span>${dateText?`<span class="tc-date">${dateText}</span>`:''}</div></div><div class="tc-matrix">${buildTaskMatrix(t.matrix,20)}</div></div><div class="delete-btn" data-delete-id="${t.id}"><svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>삭제</div></div>`;
+    return `<div class="task-card-wrapper" data-id="${t.id}"><div class="task-card" data-q="${t.matrix}" data-id="${t.id}"><div class="tc-check ${isDone?'checked':''}" data-check="${t.id}">${isDone?'✓':''}</div><div class="tc-body"><div class="tc-title ${isDone?'done':''}">${t.type==='repeat'?'🔄 ':''}${esc(t.title)}</div><div class="tc-meta"><span class="tc-badge">${t.type==='repeat'?'반복':'한 번'}</span>${dateText?`<span class="tc-date">${dateText}</span>`:''}</div></div><div class="tc-matrix">${buildTaskMatrix(t.matrix,20)}</div></div><div class="delete-btn" data-delete-id="${t.id}"><svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>삭제</div></div>`;
   }).join('');
 }
 
@@ -598,18 +598,12 @@ function toggleDone(id) {
   const t = tasks.find(x => x.id === id);
   if (!t) return;
   if (t.type === 'repeat') {
-    const td = today();
-    t.completedDates = t.completedDates || [];
-    if (t.completedDates.includes(td)) {
-      t.completedDates = t.completedDates.filter(d => d !== td);
-    } else {
-      t.completedDates.push(td);
-    }
-    t.done = isRoutineFullyDone(t);
-  } else {
-    t.done = !t.done;
-    t.doneDate = t.done ? today() : null;
+    openRoutineDetail(id);
+    return;
   }
+  
+  t.done = !t.done;
+  t.doneDate = t.done ? today() : null;
   DB.save(tasks);
   render(currentTab);
 }
@@ -1102,7 +1096,9 @@ function renderMemos() {
   }
   
   container.innerHTML = memos.map(m => {
-    const lines = m.content.split('\n').map(l => l.trim()).filter(l => l);
+    const temp = document.createElement('div');
+    temp.innerHTML = m.content;
+    const lines = temp.innerText.split('\n').map(l => l.trim()).filter(l => l);
     const title = lines.length > 0 ? lines[0] : '새로운 메모';
     const preview = lines.length > 1 ? lines[1] : '추가 텍스트 없음';
     const d = new Date(m.updatedAt);
@@ -1121,9 +1117,9 @@ function openMemoDetail(id) {
   const area = document.getElementById('memo-content-area');
   if (id) {
     const m = memos.find(x => x.id === id);
-    area.value = m ? m.content : '';
+    area.innerHTML = m ? m.content : '';
   } else {
-    area.value = '';
+    area.innerHTML = '';
   }
   document.getElementById('screen-memo-list').style.display = 'none';
   document.getElementById('screen-memo-detail').style.display = 'flex';
@@ -1138,8 +1134,13 @@ function closeMemoDetail() {
 }
 
 function saveCurrentMemo() {
-  const content = document.getElementById('memo-content-area').value.trim();
-  if (!content) {
+  const area = document.getElementById('memo-content-area');
+  const content = area.innerHTML.trim();
+  const temp = document.createElement('div');
+  temp.innerHTML = content;
+  const textContent = temp.innerText.trim();
+  
+  if (!textContent && !content.includes('<img')) {
     if (editingMemoId) {
       memos = memos.filter(m => m.id !== editingMemoId); // delete if empty
       DB.saveMemos(memos);
@@ -1164,9 +1165,19 @@ function saveCurrentMemo() {
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('memo-add-btn')?.addEventListener('click', () => openMemoDetail(null));
   document.getElementById('memo-back-btn')?.addEventListener('click', closeMemoDetail);
+  document.getElementById('memo-save-btn')?.addEventListener('click', closeMemoDetail);
   document.getElementById('memo-list-container')?.addEventListener('click', e => {
     const card = e.target.closest('.memo-card');
     if (card) openMemoDetail(card.dataset.memoId);
+  });
+  
+  document.querySelectorAll('.memo-toolbar button').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const cmd = btn.dataset.cmd;
+      if (cmd) document.execCommand(cmd, false, null);
+      document.getElementById('memo-content-area').focus();
+    });
   });
 });
 

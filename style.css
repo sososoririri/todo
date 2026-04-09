@@ -743,27 +743,41 @@ details[open] .month-group-label::after { transform: rotate(180deg); }
   background: var(--surface); border-radius: var(--r-md);
   padding: 16px; box-shadow: var(--sh-sm);
   cursor: pointer; transition: transform .15s, box-shadow .15s;
-  border-left: 4px solid #FFCD00; /* iPhone Notes Yellow */
+  border-left: 4px solid #FFCD00;
 }
 .memo-card:active { transform: scale(.98); background: var(--bg); }
 
 .memo-title {
   font-size: 15px; font-weight: 700; color: var(--text);
-  margin-bottom: 6px;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .memo-preview {
   font-size: 13px; color: var(--text2);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.memo-date {
-  font-weight: 600; color: var(--text3); margin-right: 6px; font-size: 12px;
+.memo-date { font-weight: 600; color: var(--text3); margin-right: 6px; font-size: 12px; }
+
+.header-text-btn { font-size: 15px; font-weight: 700; color: var(--plan); padding: 6px 10px; border-radius: var(--r-sm); }
+.header-text-btn:active { background: var(--plan-light); }
+
+.memo-toolbar {
+  display: flex; gap: 4px; padding: 10px 16px; align-items: center;
+  background: var(--surface); border-bottom: 1px solid var(--border); overflow-x: auto;
 }
+.memo-toolbar::-webkit-scrollbar { display: none; }
+.memo-toolbar button {
+  width: 32px; height: 32px; border-radius: var(--r-xs); font-size: 14px;
+  color: var(--text); background: var(--bg); display: flex; align-items: center; justify-content: center;
+}
+.memo-toolbar button:active { background: var(--border); }
+.tb-div { width: 1px; height: 16px; background: var(--border); margin: 0 4px; flex-shrink: 0; }
 
 .memo-textarea {
   flex: 1; width: 100%; border: none; outline: none;
   background: var(--surface); color: var(--text);
   padding: 20px; font-size: 16px; line-height: 1.6;
-  resize: none; font-family: inherit;
+  font-family: inherit; overflow-y: auto; padding-bottom: 50vh;
 }
-.memo-textarea::placeholder { color: var(--text3); }
+.memo-textarea[contenteditable]:empty::before { content: attr(aria-placeholder); color: var(--text3); pointer-events: none; }
+.memo-textarea ul { padding-left: 24px; list-style-type: disc; margin: 4px 0; }
+.memo-textarea ol { padding-left: 24px; list-style-type: decimal; margin: 4px 0; }
