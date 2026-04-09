@@ -17,10 +17,13 @@ const DAY_KR = { Mon:'월',Tue:'화',Wed:'수',Thu:'목',Fri:'금',Sat:'토',Sun
 const DB = {
   load() { try { return JSON.parse(localStorage.getItem('mtx_tasks') || '[]'); } catch { return []; } },
   save(t) { localStorage.setItem('mtx_tasks', JSON.stringify(t)); },
+  loadMemos() { try { return JSON.parse(localStorage.getItem('mtx_memos') || '[]'); } catch { return []; } },
+  saveMemos(m) { localStorage.setItem('mtx_memos', JSON.stringify(m)); }
 };
 
 // ── STATE ──────────────────────────────────
 let tasks = DB.load();
+let memos = DB.loadMemos();
 let currentTab = 'matrix';
 let dbStatusFilter = 'incomplete';
 let calDate = new Date();
@@ -69,6 +72,34 @@ function isTaskOnDate(task, dateStr) {
   return task.repeatDays.includes(dayMap[d.getDay()]);
 }
 
+// Check if a repeating routine is fully completed (all dates are checked)
+function isRoutineFullyDone(task) {
+  if (task.type !== 'repeat') return task.done;
+  if (!task.endDate) return false; // Infinite routines are never fully "done"
+
+  const start = task.startDate || task.date || today();
+  const rawEnd = task.endDate;
+  const completedDates = task.completedDates || [];
+  const dayMap = {0:'Sun',1:'Mon',2:'Tue',3:'Wed',4:'Thu',5:'Fri',6:'Sat'};
+  
+  let cur = new Date(start+'T00:00:00');
+  const endD = new Date(rawEnd+'T00:00:00');
+  let requiredDates = 0;
+  let finishedDates = 0;
+
+  while (cur <= endD) {
+    const ds = fmtDate(cur);
+    const dow = dayMap[cur.getDay()];
+    if (!task.repeatDays || task.repeatDays.length === 0 || task.repeatDays.includes(dow)) {
+      requiredDates++;
+      if (completedDates.includes(ds)) finishedDates++;
+    }
+    cur.setDate(cur.getDate()+1);
+  }
+
+  return requiredDates > 0 && finishedDates >= requiredDates;
+}
+
 // ── MINI MATRIX BUILDER ────────────────────
 function buildMiniMx(type, size = 22) {
   const cells = ['do','plan','delegate','eliminate'];
@@ -102,6 +133,7 @@ function render(tab) {
   if (tab === 'dashboard') renderDashboard();
   if (tab === 'calendar')  renderCalendar();
   if (tab === 'stats')     renderStats();
+  if (tab === 'memo')      renderMemos();
 }
 
 // ── MATRIX SCREEN ──────────────────────────
@@ -117,9 +149,9 @@ function renderMatrix() {
                       
     // Status filter
     if (matrixStatusFilter === 'incomplete') {
-      qTasks = qTasks.filter(t => t.type === 'repeat' ? !(t.completedDates||[]).includes(td) : !t.done);
+      qTasks = qTasks.filter(t => !t.done);
     } else if (matrixStatusFilter === 'complete') {
-      qTasks = qTasks.filter(t => t.type === 'repeat' ? (t.completedDates||[]).includes(td) : t.done);
+      qTasks = qTasks.filter(t => t.done);
     }
 
     if (qTasks.length === 0) {
@@ -154,9 +186,9 @@ function renderDashboard() {
   const td = today();
   let filtered = [...tasks].sort((a,b) => (a.date||'9999').localeCompare(b.date||'9999'));
   if (dbStatusFilter === 'incomplete') {
-    filtered = filtered.filter(t => t.type === 'repeat' ? !(t.completedDates||[]).includes(td) : !t.done);
+    filtered = filtered.filter(t => !t.done);
   } else if (dbStatusFilter === 'complete') {
-    filtered = filtered.filter(t => t.type === 'repeat' ? (t.completedDates||[]).includes(td) : t.done);
+    filtered = filtered.filter(t => t.done);
   }
   if (filtered.length === 0) {
     const icons = {complete:'🎉',incomplete:'✅',all:'📋'};
@@ -464,6 +496,10 @@ function openEditTask(id) {
   document.getElementById('modal-date-label').textContent = formatDateLabel(dateVal);
   document.getElementById('repeat-start').value = t.startDate || today();
   document.getElementById('repeat-end').value   = t.endDate   || '';
+  
+  document.getElementById('notif-toggle').checked = !!t.notificationTime;
+  document.getElementById('notif-time-row').style.display = t.notificationTime ? '' : 'none';
+  document.getElementById('notif-time').value = t.notificationTime || '';
 
   document.querySelectorAll('#full-matrix-sel .m-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.m === t.matrix);
@@ -569,7 +605,7 @@ function toggleDone(id) {
     } else {
       t.completedDates.push(td);
     }
-    t.done = t.completedDates.includes(td);
+    t.done = isRoutineFullyDone(t);
   } else {
     t.done = !t.done;
     t.doneDate = t.done ? today() : null;
@@ -600,7 +636,7 @@ function toggleRoutineDate(taskId, dateStr) {
   } else {
     t.completedDates.push(dateStr);
   }
-  t.done = t.completedDates.includes(today());
+  t.done = isRoutineFullyDone(t);
   DB.save(tasks);
   document.getElementById('routine-body').innerHTML = buildRoutineContent(t);
 }
@@ -692,6 +728,44 @@ function setMatrixFilter(val) {
 // ── NOTIFICATIONS ──────────────────────────
 function requestNotifPermission() {
   if ('Notification' in window && Notification.permission==='default') Notification.requestPermission();
+}
+
+let lastNotifTime = {};
+function showLocalNotification(title) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  // Prevent duplicate notifications in same minute
+  if (lastNotifTime[title] && (Date.now() - lastNotifTime[title] < 60000)) return;
+  lastNotifTime[title] = Date.now();
+
+  if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+    navigator.serviceWorker.ready.then(reg => {
+      reg.showNotification('Matrix TODO', {
+        body: title,
+        vibrate: [200, 100, 200]
+      });
+    });
+  } else {
+    new Notification('Matrix TODO', { body: title });
+  }
+}
+
+function checkNotifications() {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  const now = new Date();
+  const timeStr = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+  const dStr = fmtDate(now);
+  
+  tasks.forEach(t => {
+    if (!t.done && t.notificationTime === timeStr) {
+      if (t.type === 'once' && t.date === dStr) {
+        showLocalNotification(t.title);
+      } else if (t.type === 'repeat' && isTaskOnDate(t, dStr)) {
+        if (!(t.completedDates||[]).includes(dStr)) {
+          showLocalNotification(t.title);
+        }
+      }
+    }
+  });
 }
 
 function deleteTask(id) {
@@ -793,6 +867,7 @@ function bindEvents() {
   // NOTIFICATION TOGGLE
   document.getElementById('notif-toggle').addEventListener('change', e => {
     document.getElementById('notif-time-row').style.display = e.target.checked ? '' : 'none';
+    if (e.target.checked) requestNotifPermission();
   });
 
   // DATE LABEL CLICK → open date picker
@@ -988,6 +1063,10 @@ function init() {
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js').catch(() => {});
   }
+  
+  // Notification Loop
+  setInterval(checkNotifications, 60000);
+  setTimeout(checkNotifications, 2000);
 
   // Seed sample tasks if empty
   if (tasks.length === 0) seedSampleData();
@@ -1009,4 +1088,87 @@ function seedSampleData() {
   render('matrix');
 }
 
+// ── MEMO SCREEN ─────────────────────────────
+let editingMemoId = null;
+
+function renderMemos() {
+  const container = document.getElementById('memo-list-container');
+  if (!container) return;
+  memos.sort((a,b) => b.updatedAt - a.updatedAt);
+  
+  if (memos.length === 0) {
+    container.innerHTML = `<div class="empty-state" style="padding:40px 0"><p>작성된 메모가 없습니다</p></div>`;
+    return;
+  }
+  
+  container.innerHTML = memos.map(m => {
+    const lines = m.content.split('\n').map(l => l.trim()).filter(l => l);
+    const title = lines.length > 0 ? lines[0] : '새로운 메모';
+    const preview = lines.length > 1 ? lines[1] : '추가 텍스트 없음';
+    const d = new Date(m.updatedAt);
+    const dtStr = `${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;
+    return `
+      <div class="memo-card" data-memo-id="${m.id}">
+        <div class="memo-title">${esc(title)}</div>
+        <div class="memo-preview"><span class="memo-date">${dtStr}</span> ${esc(preview)}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+function openMemoDetail(id) {
+  editingMemoId = id;
+  const area = document.getElementById('memo-content-area');
+  if (id) {
+    const m = memos.find(x => x.id === id);
+    area.value = m ? m.content : '';
+  } else {
+    area.value = '';
+  }
+  document.getElementById('screen-memo-list').style.display = 'none';
+  document.getElementById('screen-memo-detail').style.display = 'flex';
+  setTimeout(() => { area.focus(); }, 100);
+}
+
+function closeMemoDetail() {
+  saveCurrentMemo();
+  document.getElementById('screen-memo-list').style.display = 'flex';
+  document.getElementById('screen-memo-detail').style.display = 'none';
+  render('memo');
+}
+
+function saveCurrentMemo() {
+  const content = document.getElementById('memo-content-area').value.trim();
+  if (!content) {
+    if (editingMemoId) {
+      memos = memos.filter(m => m.id !== editingMemoId); // delete if empty
+      DB.saveMemos(memos);
+    }
+    editingMemoId = null;
+    return;
+  }
+  
+  if (editingMemoId) {
+    const m = memos.find(x => x.id === editingMemoId);
+    if (m && m.content !== content) {
+      m.content = content;
+      m.updatedAt = Date.now();
+    }
+  } else {
+    memos.push({ id: uid(), content, createdAt: Date.now(), updatedAt: Date.now() });
+  }
+  DB.saveMemos(memos);
+  editingMemoId = null;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('memo-add-btn')?.addEventListener('click', () => openMemoDetail(null));
+  document.getElementById('memo-back-btn')?.addEventListener('click', closeMemoDetail);
+  document.getElementById('memo-list-container')?.addEventListener('click', e => {
+    const card = e.target.closest('.memo-card');
+    if (card) openMemoDetail(card.dataset.memoId);
+  });
+});
+
 document.addEventListener('DOMContentLoaded', init);
+
