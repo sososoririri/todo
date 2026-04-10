@@ -2,6 +2,22 @@
    MATRIX TODO — app.js
 ════════════════════════════════════════════ */
 
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+import { getFirestore, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+
+const firebaseConfig = {
+    apiKey: "AIzaSyDB_KH5ocr9IpUG3zo7h4UAUiePvlqXG54",
+    authDomain: "eok-eok-eok.firebaseapp.com",
+    projectId: "eok-eok-eok",
+    storageBucket: "eok-eok-eok.firebasestorage.app",
+    messagingSenderId: "1074375686114",
+    appId: "1:1074375686114:web:0be6221509907ddf26ebbb",
+    measurementId: "G-LYGTDV4L7M"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
 // ── CONSTANTS ──────────────────────────────
 const COLORS = ['#2D4A52','#7B6B5E','#8B5E52','#C4A882','#8B8B8B','#2C3E80','#E8305A','#4A90D9'];
 const MATRIX = {
@@ -15,15 +31,13 @@ const DAY_KR = { Mon:'월',Tue:'화',Wed:'수',Thu:'목',Fri:'금',Sat:'토',Sun
 
 // ── DATA LAYER ─────────────────────────────
 const DB = {
-  load() { try { return JSON.parse(localStorage.getItem('mtx_tasks') || '[]'); } catch { return []; } },
-  save(t) { localStorage.setItem('mtx_tasks', JSON.stringify(t)); },
-  loadMemos() { try { return JSON.parse(localStorage.getItem('mtx_memos') || '[]'); } catch { return []; } },
-  saveMemos(m) { localStorage.setItem('mtx_memos', JSON.stringify(m)); }
+  save(t) { setDoc(doc(db, "assets", "todo_tasks"), { items: t }); },
+  saveMemos(m) { setDoc(doc(db, "assets", "todo_memos"), { items: m }); }
 };
 
 // ── STATE ──────────────────────────────────
-let tasks = DB.load();
-let memos = DB.loadMemos();
+let tasks = [];
+let memos = [];
 let currentTab = 'matrix';
 let dbStatusFilter = 'incomplete';
 let calDate = new Date();
@@ -440,7 +454,7 @@ function saveQuickTask() {
 }
 
 // ── FULL ADD ───────────────────────────────
-function openFullAdd(defaultMatrix = 'do', defaultDate = null) {
+function openFullAdd(defaultMatrix = 'do', defaultDate = null, defaultTitle = '') {
   editingId = null;
   fullSelectedMatrix = defaultMatrix;
   fullSelectedColor = COLORS[0];
@@ -449,7 +463,7 @@ function openFullAdd(defaultMatrix = 'do', defaultDate = null) {
   fullRepeatDays = [];
 
   const dateVal = defaultDate || today();
-  document.getElementById('full-title').value = '';
+  document.getElementById('full-title').value = defaultTitle;
   document.getElementById('task-date').value = dateVal;
   document.getElementById('modal-date-label').textContent = formatDateLabel(dateVal);
   document.getElementById('repeat-start').value = defaultDate || today();
@@ -597,10 +611,6 @@ function setTaskType(type) {
 function toggleDone(id) {
   const t = tasks.find(x => x.id === id);
   if (!t) return;
-  if (t.type === 'repeat') {
-    openRoutineDetail(id);
-    return;
-  }
   
   t.done = !t.done;
   t.doneDate = t.done ? today() : null;
@@ -666,6 +676,7 @@ function buildRoutineContent(task) {
     months[mLabel].push(d);
   });
 
+  const curMonthLabel = `${new Date().getMonth()+1}월`;
   const grid = Object.keys(months).map(mLabel => {
     const cells = months[mLabel].map(d => {
       const done=completedDates.includes(d);
@@ -675,7 +686,8 @@ function buildRoutineContent(task) {
         <span class="habit-date-lbl">${parseInt(m)}.${parseInt(day)}</span>
       </div>`;
     }).join('');
-    return `<details class="month-group" open>
+    const isOpen = (mLabel === curMonthLabel) ? 'open' : '';
+    return `<details class="month-group" ${isOpen}>
       <summary class="month-group-label">${mLabel}</summary>
       <div class="habit-grid">${cells}</div>
     </details>`;
@@ -807,8 +819,9 @@ function bindEvents() {
   // OPEN FULL ADD from quick sheet
   document.getElementById('open-full-add').addEventListener('click', () => {
     const date = quickDefaultDate;
+    const title = document.getElementById('quick-title').value;
     closeQuickAdd();
-    setTimeout(() => openFullAdd(quickSelectedMatrix, date), 200);
+    setTimeout(() => openFullAdd(quickSelectedMatrix, date, title), 200);
   });
 
   // FULL ADD SAVE/CLOSE
@@ -936,6 +949,9 @@ function bindEvents() {
     const delBtn = e.target.closest('.delete-btn[data-delete-id]');
     if (delBtn) { e.stopPropagation(); deleteTask(delBtn.dataset.deleteId); return; }
     
+    const delMemoBtn = e.target.closest('.delete-btn[data-delete-memo-id]');
+    if (delMemoBtn) { e.stopPropagation(); deleteMemo(delMemoBtn.dataset.deleteMemoId); return; }
+    
     // Auto-close swipe state if clicking somewhere else
     const swiped = document.querySelector('.task-card-wrapper.swiped');
     if (swiped && !e.target.closest('.task-card-wrapper.swiped')) { swiped.classList.remove('swiped'); }
@@ -1002,9 +1018,16 @@ function bindEvents() {
     if (menu && !e.target.closest('#sort-menu') && !e.target.closest('#matrix-filter-btn')) menu.classList.remove('open');
   }, true);
   // ROUTINE MODAL CLOSE/EDIT
-  document.getElementById('routine-close').addEventListener('click', closeRoutineDetail);
+  document.getElementById('routine-close').addEventListener('click', e => {
+    e.stopPropagation(); e.preventDefault();
+    closeRoutineDetail();
+    // Ghost click block
+    document.body.style.pointerEvents = 'none';
+    setTimeout(() => { document.body.style.pointerEvents = ''; }, 350);
+  });
   document.getElementById('routine-edit-btn').addEventListener('click', e => {
     const id = e.currentTarget.dataset.id;
+    e.stopPropagation(); e.preventDefault();
     closeRoutineDetail();
     setTimeout(() => openEditTask(id), 300);
   });
@@ -1062,8 +1085,25 @@ function init() {
   setInterval(checkNotifications, 60000);
   setTimeout(checkNotifications, 2000);
 
-  // Seed sample tasks if empty
-  if (tasks.length === 0) seedSampleData();
+  startDatabaseSync();
+}
+
+function startDatabaseSync() {
+  onSnapshot(doc(db, "assets", "todo_tasks"), (docSnap) => {
+    if (docSnap.exists()) {
+      tasks = docSnap.data().items || [];
+      render(currentTab);
+    } else {
+      if (tasks.length === 0) seedSampleData();
+    }
+  });
+
+  onSnapshot(doc(db, "assets", "todo_memos"), (docSnap) => {
+    if (docSnap.exists()) {
+      memos = docSnap.data().items || [];
+      if (currentTab === 'memo') renderMemos();
+    }
+  });
 }
 
 function seedSampleData() {
@@ -1104,12 +1144,24 @@ function renderMemos() {
     const d = new Date(m.updatedAt);
     const dtStr = `${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;
     return `
-      <div class="memo-card" data-memo-id="${m.id}">
-        <div class="memo-title">${esc(title)}</div>
-        <div class="memo-preview"><span class="memo-date">${dtStr}</span> ${esc(preview)}</div>
+      <div class="task-card-wrapper" data-memo-wrapper="${m.id}">
+        <div class="memo-card" data-memo-id="${m.id}" style="width:100%;flex-shrink:0;margin-bottom:0px">
+          <div class="memo-title">${esc(title)}</div>
+          <div class="memo-preview"><span class="memo-date">${dtStr}</span> ${esc(preview)}</div>
+        </div>
+        <div class="delete-btn" data-delete-memo-id="${m.id}" style="border-radius:12px;margin-bottom:0px">
+          <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+          삭제
+        </div>
       </div>
     `;
   }).join('');
+}
+
+function deleteMemo(id) {
+  memos = memos.filter(m => m.id !== id);
+  DB.saveMemos(memos);
+  renderMemos();
 }
 
 function openMemoDetail(id) {
