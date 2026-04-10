@@ -1174,11 +1174,11 @@ function renderMemos() {
     const dtStr = `${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;
     return `
       <div class="task-card-wrapper" data-memo-wrapper="${m.id}">
-        <div class="memo-card" data-memo-id="${m.id}" style="width:100%;flex-shrink:0;margin-bottom:0px">
+        <div class="memo-card" data-memo-id="${m.id}">
           <div class="memo-title">${esc(title)}</div>
           <div class="memo-preview"><span class="memo-date">${dtStr}</span> ${esc(preview)}</div>
         </div>
-        <div class="delete-btn" data-delete-memo-id="${m.id}" style="border-radius:12px;margin-bottom:0px">
+        <div class="delete-btn" data-delete-memo-id="${m.id}">
           <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
           삭제
         </div>
