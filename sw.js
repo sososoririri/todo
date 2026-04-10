@@ -1,4 +1,4 @@
-const CACHE = 'matrix-todo-v13';
+const CACHE = 'matrix-todo-v15';
 const ASSETS = ['./', './index.html', './style.css', './app.js', './manifest.json'];
 
 self.addEventListener('install', e => {
@@ -14,10 +14,10 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
+  if (e.request.method !== 'GET') return;
   e.respondWith(
-    fetch(e.request)
+    fetch(e.request, { cache: 'no-store' })
       .then(res => {
-        // Update cache with the new network response
         const resClone = res.clone();
         caches.open(CACHE).then(cache => cache.put(e.request, resClone));
         return res;
