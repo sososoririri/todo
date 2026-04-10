@@ -826,7 +826,15 @@ function bindEvents() {
 
   // FULL ADD SAVE/CLOSE
   document.getElementById('full-save').addEventListener('click', saveFullTask);
-  document.getElementById('full-close').addEventListener('click', closeFullAdd);
+  const fcBtn = document.getElementById('full-close');
+  const closeFullHandler = e => {
+    e.preventDefault(); e.stopPropagation();
+    closeFullAdd();
+    document.body.style.pointerEvents = 'none';
+    setTimeout(() => { document.body.style.pointerEvents = ''; }, 400);
+  };
+  fcBtn.addEventListener('click', closeFullHandler);
+  fcBtn.addEventListener('touchend', closeFullHandler, {passive: false});
 
   // FULL MATRIX SEL
   document.querySelectorAll('#full-matrix-sel .m-btn').forEach(btn => {
@@ -889,6 +897,8 @@ function bindEvents() {
   // OVERLAY CLICK → close sheets
   document.getElementById('overlay').addEventListener('click', () => {
     closeQuickAdd();
+    closeRoutineDetail();
+    closeFullAdd();
   });
 
   // STATUS FILTER TABS (dashboard)
@@ -973,7 +983,11 @@ function bindEvents() {
     const chk = e.target.closest('.q-cb[data-check]');
     if (chk) { e.stopPropagation(); toggleDone(chk.dataset.check); return; }
     const task = e.target.closest('.q-task[data-id]');
-    if (task) openEditTask(task.dataset.id);
+    if (task) {
+      const t = tasks.find(x => x.id === task.dataset.id);
+      if (t && t.type==='repeat') openRoutineDetail(task.dataset.id);
+      else openEditTask(task.dataset.id);
+    }
   });
 
   // CALENDAR nav
@@ -1018,13 +1032,15 @@ function bindEvents() {
     if (menu && !e.target.closest('#sort-menu') && !e.target.closest('#matrix-filter-btn')) menu.classList.remove('open');
   }, true);
   // ROUTINE MODAL CLOSE/EDIT
-  document.getElementById('routine-close').addEventListener('click', e => {
-    e.stopPropagation(); e.preventDefault();
+  const rcBtn = document.getElementById('routine-close');
+  const closeRoutineHandler = e => {
+    e.preventDefault(); e.stopPropagation();
     closeRoutineDetail();
-    // Ghost click block
     document.body.style.pointerEvents = 'none';
-    setTimeout(() => { document.body.style.pointerEvents = ''; }, 350);
-  });
+    setTimeout(() => { document.body.style.pointerEvents = ''; }, 400);
+  };
+  rcBtn.addEventListener('click', closeRoutineHandler);
+  rcBtn.addEventListener('touchend', closeRoutineHandler, {passive: false});
   document.getElementById('routine-edit-btn').addEventListener('click', e => {
     const id = e.currentTarget.dataset.id;
     e.stopPropagation(); e.preventDefault();
@@ -1136,11 +1152,20 @@ function renderMemos() {
   }
   
   container.innerHTML = memos.map(m => {
+    let html = m.content || '';
+    html = html.replace(/<div[^>]*>/gi, '\n').replace(/<\/div>/gi, '');
+    html = html.replace(/<p[^>]*>/gi, '\n').replace(/<\/p>/gi, '');
+    html = html.replace(/<br[^>]*>/gi, '\n');
+    html = html.replace(/<li[^>]*>/gi, '\n');
     const temp = document.createElement('div');
-    temp.innerHTML = m.content;
-    const lines = temp.innerText.split('\n').map(l => l.trim()).filter(l => l);
+    temp.innerHTML = html;
+    const textStr = temp.textContent || temp.innerText || '';
+    const lines = textStr.split('\n').map(l => l.trim()).filter(l => l);
     const title = lines.length > 0 ? lines[0] : '새로운 메모';
-    const preview = lines.length > 1 ? lines[1] : '추가 텍스트 없음';
+    let preview = '추가 텍스트 없음';
+    if (lines.length > 1) {
+      preview = lines.slice(1).join(' ').substring(0, 50);
+    }
     const d = new Date(m.updatedAt);
     const dtStr = `${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;
     return `
@@ -1159,6 +1184,7 @@ function renderMemos() {
 }
 
 function deleteMemo(id) {
+  if (!confirm('이 메모를 삭제할까요?')) return;
   memos = memos.filter(m => m.id !== id);
   DB.saveMemos(memos);
   renderMemos();
@@ -1230,6 +1256,19 @@ document.addEventListener('DOMContentLoaded', () => {
       if (cmd) document.execCommand(cmd, false, null);
       document.getElementById('memo-content-area').focus();
     });
+  });
+  
+  document.getElementById('memo-detail-del-btn')?.addEventListener('click', () => {
+    if (editingMemoId) {
+      if (confirm('이 메모를 영구적으로 삭제할까요?')) {
+        memos = memos.filter(m => m.id !== editingMemoId);
+        DB.saveMemos(memos);
+        editingMemoId = null;
+        document.getElementById('screen-memo-detail').style.display = 'none';
+        document.getElementById('screen-memo-list').style.display = 'flex';
+        renderMemos();
+      }
+    }
   });
 });
 
