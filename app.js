@@ -797,8 +797,12 @@ function bindEvents() {
   document.addEventListener('click', e => {
     const btn = e.target.closest('.open-quick-add');
     if (btn) {
-      const date = currentTab === 'calendar' ? fmtDate(calSelected) : null;
-      openQuickAdd(btn.dataset.defaultMatrix || 'do', date);
+      if (currentTab === 'memo') {
+        openMemoDetail(null);
+      } else {
+        const date = currentTab === 'calendar' ? fmtDate(calSelected) : null;
+        openQuickAdd(btn.dataset.defaultMatrix || 'do', date);
+      }
     }
   });
 
