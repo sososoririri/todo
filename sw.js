@@ -1,4 +1,4 @@
-const CACHE = 'matrix-todo-v15';
+const CACHE = 'matrix-todo-v16';
 const ASSETS = ['./', './index.html', './style.css', './app.js', './manifest.json'];
 
 self.addEventListener('install', e => {

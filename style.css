@@ -237,7 +237,7 @@ input { font-family: inherit; }
 .task-card-wrapper {
   position: relative; border-radius: var(--r-md); background: #FF3B30;
 }
-.task-card-wrapper.swiped .task-card { transform: translateX(-65px); }
+.task-card-wrapper.swiped .task-card, .task-card-wrapper.swiped .memo-card { transform: translateX(-65px); }
 
 .task-card {
   position: relative; z-index: 2;
@@ -248,7 +248,7 @@ input { font-family: inherit; }
 }
 .task-card:hover { box-shadow: var(--sh-md); }
 .task-card:active { transform: scale(.99); background: var(--bg); }
-.task-card-wrapper.swiped .task-card:active { transform: translateX(-65px) scale(.99); }
+.task-card-wrapper.swiped .task-card:active, .task-card-wrapper.swiped .memo-card:active { transform: translateX(-65px) scale(.99); }
 
 .delete-btn {
   position: absolute; right: 0; top: 0; bottom: 0; width: 65px; border-radius: 0 var(--r-md) var(--r-md) 0;
@@ -739,11 +739,14 @@ details[open] .month-group-label::after { transform: rotate(180deg); }
 }
 .memo-scroll::-webkit-scrollbar { display: none; }
 
+.memo-wrap { position: relative; overflow: hidden; border-radius: var(--r-md); }
 .memo-card {
-  background: var(--surface); border-radius: var(--r-md);
-  padding: 16px; box-shadow: var(--sh-sm);
-  cursor: pointer; transition: transform .15s, box-shadow .15s;
+  display: flex; flex-direction: column;
+  background: var(--surface); padding: 16px; border-radius: 12px;
+  cursor: pointer; position: relative; z-index: 2;
+  transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow .15s, filter .15s;
   border-left: 4px solid #FFCD00;
+  width: 100%; overflow: hidden; min-width: 0;
 }
 .memo-card:active { transform: scale(.98); background: var(--bg); }
 
